@@ -1,0 +1,74 @@
+# Règles Cursor pour Scan-Learn
+
+## Patterns de Code
+
+### 1. Gestion des États React
+```typescript
+// Toujours utiliser useRef pour les valeurs qui persistent entre les renders
+const someRef = useRef<Type>(initialValue);
+
+// useState pour les valeurs qui déclenchent des re-renders
+const [state, setState] = useState<Type>(initialValue);
+```
+
+### 2. Pattern de Polling
+```typescript
+// Structure standard pour le polling
+const intervalRef = useRef<NodeJS.Timeout | null>(null);
+const pollingRef = useRef<boolean>(true);
+
+// Toujours inclure un cleanup
+useEffect(() => {
+  // ... logique de polling ...
+  return () => {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+    pollingRef.current = false;
+  };
+}, []);
+```
+
+### 3. Gestion des Erreurs
+```typescript
+// Structure standard pour la gestion des erreurs
+try {
+  // ... code ...
+} catch (err: any) {
+  console.error('❌ Message d\'erreur:', err);
+  setError(err.message || 'Message d\'erreur par défaut');
+  // Toujours nettoyer les ressources en cas d'erreur
+  if (intervalRef.current) {
+    clearInterval(intervalRef.current);
+    intervalRef.current = null;
+  }
+}
+```
+
+## Préférences de Style
+
+### 1. Messages Console
+- ✅ Succès : console.log('✅ Message')
+- ❌ Erreur : console.error('❌ Message')
+- 📊 Stats : console.log('📊 Message')
+- 🛑 Arrêt : console.log('🛑 Message')
+- ⚠️ Warning : console.warn('⚠️ Message')
+
+### 2. Classes Tailwind
+- Statut succès : text-green-600
+- Statut erreur : text-red-600
+- Statut en cours : text-blue-600
+- Conteneurs : bg-gray-50 p-4 rounded-lg
+
+## Conventions de Nommage
+- Refs : suffixe 'Ref' (intervalRef, pollingRef)
+- États : préfixe descriptif (isLoading, hasError)
+- Handlers : préfixe 'handle' (handleSubmit, handleError)
+- Messages d'erreur : explicites et actionnables
+
+## Règles de Performance
+- Intervalle de polling : 10 secondes
+- Nombre maximum de tentatives : 3
+- Toujours nettoyer les intervalles
+- Éviter les re-renders inutiles 
