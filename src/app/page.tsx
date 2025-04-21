@@ -8,9 +8,7 @@ import Image from 'next/image';
 export default function Home() {
   const router = useRouter();
 
-  const handleAnalysisSuccess = (threadId: string) => {
-    router.push(`/results/${threadId}`);
-  };
+
 
   return (
     <div className="min-h-screen bg-white">
@@ -34,15 +32,7 @@ export default function Home() {
                 </Link>
               </div>
             </div>
-            <div className="relative h-96 hidden md:block">
-              <Image
-                src="/hero-image.png"
-                alt="Étudiant utilisant l'application"
-                fill
-                className="object-contain"
-                priority
-              />
-            </div>
+           
           </div>
         </div>
       </div>

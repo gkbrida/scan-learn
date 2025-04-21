@@ -3,10 +3,29 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createBrowserClient } from '@supabase/ssr';
+import { toast } from 'sonner';
 
 const supabase = createBrowserClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+  {
+    cookies: {
+      get(name: string) {
+        const cookie = document.cookie
+          .split(';')
+          .find((c) => c.trim().startsWith(`${name}=`));
+        if (!cookie) return null;
+        const value = cookie.split('=')[1];
+        return decodeURIComponent(value);
+      },
+      set(name: string, value: string, options: { path?: string; domain?: string; maxAge?: number; httpOnly?: boolean }) {
+        document.cookie = `${name}=${encodeURIComponent(value)}; path=${options.path || '/'}; max-age=${options.maxAge || 31536000}`;
+      },
+      remove(name: string, options: { path?: string }) {
+        document.cookie = `${name}=; path=${options.path || '/'}; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
+      }
+    }
+  }
 );
 
 export default function ModifierPasswordPage() {
@@ -15,23 +34,56 @@ export default function ModifierPasswordPage() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const handleSubmit = async () => {
     try {
+      // Validation des mots de passe
       if (newPassword !== confirmPassword) {
-        alert('Les mots de passe ne correspondent pas');
+        toast.error('Les mots de passe ne correspondent pas');
         return;
       }
+
+      if (newPassword.length < 6) {
+        toast.error('Le mot de passe doit contenir au moins 6 caractères');
+        return;
+      }
+
+      setLoading(true);
 
       const { error } = await supabase.auth.updateUser({
         password: newPassword
       });
 
-      if (error) throw error;
+      if (error) {
+        if (error.message.includes('should be different from the old password')) {
+          toast.error('Le nouveau mot de passe doit être différent de l\'ancien');
+        } else {
+          toast.error('Une erreur est survenue lors de la mise à jour du mot de passe');
+          console.error('❌ Erreur lors de la mise à jour du mot de passe:', error);
+        }
+        return;
+      }
 
-      router.push('/profil');
+      // Forcer une nouvelle session après la mise à jour du mot de passe
+      await supabase.auth.refreshSession();
+      
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        await supabase.auth.signOut();
+        toast.error('Session expirée. Veuillez vous reconnecter.');
+        router.push('/auth/login');
+        return;
+      }
+
+      toast.success('Mot de passe mis à jour avec succès');
+      router.push('/dashboard');
     } catch (error) {
-      console.error('Erreur lors de la mise à jour du mot de passe:', error);
+      console.error('❌ Erreur:', error);
+      toast.error('Une erreur est survenue');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -64,8 +116,11 @@ export default function ModifierPasswordPage() {
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
                 className="w-full p-4 rounded-2xl bg-white border border-gray-200 text-[17px]"
+                minLength={6}
+                required
               />
               <button
+                type="button"
                 onClick={() => setShowNewPassword(!showNewPassword)}
                 className="absolute right-4 top-1/2 -translate-y-1/2"
               >
@@ -89,8 +144,11 @@ export default function ModifierPasswordPage() {
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 className="w-full p-4 rounded-2xl bg-white border border-gray-200 text-[17px]"
+                minLength={6}
+                required
               />
               <button
+                type="button"
                 onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                 className="absolute right-4 top-1/2 -translate-y-1/2"
               >
@@ -110,9 +168,10 @@ export default function ModifierPasswordPage() {
         <div className="absolute bottom-8 left-4 right-4 md:left-1/2 md:-translate-x-1/2 md:w-full md:max-w-2xl md:px-4">
           <button
             onClick={handleSubmit}
-            className="w-full bg-black text-white rounded-full py-4 text-lg font-medium"
+            disabled={loading}
+            className="w-full bg-black text-white rounded-full py-4 text-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Valider
+            {loading ? "Mise à jour..." : "Valider"}
           </button>
         </div>
       </div>

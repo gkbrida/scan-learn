@@ -1,9 +1,10 @@
 'use client';
 
 import { createBrowserClient } from '@supabase/ssr';
-import { useCallback, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import { toast } from 'sonner';
 
 export default function LoginButton() {
   const [email, setEmail] = useState('');
@@ -11,48 +12,83 @@ export default function LoginButton() {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  // Initialiser le client Supabase une seule fois
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
 
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
-    const supabase = createBrowserClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    );
-
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { error, data } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
+      console.log('error', error);
+      console.log('data', data);
 
-      if (error) throw error;
-      router.push('/dashboard');
-    } catch (error) {
-      console.error('Erreur de connexion:', error);
+      if (error) {
+        if (error.message === 'Invalid login credentials') {
+          toast.error('Email ou mot de passe incorrect');
+        } else if (error.message.includes('Email not confirmed')) {
+          toast.error('Veuillez confirmer votre email avant de vous connecter');
+        } else {
+          toast.error('Une erreur est survenue lors de la connexion');
+        }
+        console.log('❌ Détails de l\'erreur:', error.message);
+        return;
+      }
+
+      toast.success('Connexion réussie !');
+      
+      // Attendre que le token soit bien stocké avant la redirection
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      
+      // Rediriger vers la bonne page
+      const redirectPath = searchParams?.get('redirectTo');
+      if (redirectPath && redirectPath.startsWith('/')) {
+        router.push(redirectPath);
+      } else {
+        router.push('/dashboard');
+      }
+    } catch (error: any) {
+      toast.error('Une erreur inattendue est survenue');
+      console.log('❌ Erreur inattendue:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleGoogleLogin = useCallback(async () => {
-    const supabase = createBrowserClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    );
+  const handleGoogleLogin = async () => {
+    try {
+      const { error, data } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          },
+        },
+      });
 
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
-      },
-    });
+      if (error) {
+        console.error('❌ Erreur de connexion Google:', error);
+        toast.error('Erreur lors de la connexion avec Google');
+        return;
+      }
 
-    if (error) {
-      console.error('Erreur de connexion Google:', error);
+      // La redirection est gérée automatiquement par Supabase pour OAuth
+    } catch (error: any) {
+      console.error('❌ Erreur inattendue:', error);
+      toast.error('Une erreur inattendue est survenue');
     }
-  }, []);
+  };
 
   return (
     <div className="w-full space-y-8">
@@ -134,9 +170,10 @@ export default function LoginButton() {
 
       <button
         onClick={handleGoogleLogin}
-        className="w-full flex items-center justify-center py-3 px-4 border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors"
+        disabled={loading}
+        className="flex w-full items-center justify-center gap-3 rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus-visible:ring-2 focus-visible:ring-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        <svg className="h-6 w-6 mr-2" viewBox="0 0 24 24">
+        <svg className="h-5 w-5" viewBox="0 0 24 24">
           <path
             d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
             fill="#4285F4"
@@ -154,7 +191,7 @@ export default function LoginButton() {
             fill="#EA4335"
           />
         </svg>
-        <span>Google</span>
+        {loading ? 'Connexion en cours...' : 'Continuer avec Google'}
       </button>
 
       <div className="text-center">
