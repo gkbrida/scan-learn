@@ -442,7 +442,7 @@ ul, ol { padding-left: 20px; }
     </div>
   </section>
 </article>`,
-      model: "gpt-4-turbo-previe",
+      model: "gpt-4-turbo-preview",
       tools: [{ type: "file_search" }],
       tool_resources: {
         file_search: {
