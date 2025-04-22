@@ -383,7 +383,7 @@ export default function FichePage() {
       });
 
       if (!response.ok) {
-        throw new Error('Erreur lors de la génération des cartes');
+        throw new Error('Erreur lors de la génération des cartes O1', response);
       }
 
       toast.success('Cartes générées avec succès !');
@@ -391,7 +391,7 @@ export default function FichePage() {
       await fetchCards();
     } catch (error) {
       console.error('❌ Erreur:', error);
-      toast.error('Erreur lors de la génération des cartes');
+      toast.error('Erreur lors de la génération des cartes 02', error);
     } finally {
       setIsLoadingCards(false);
     }
