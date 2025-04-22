@@ -390,8 +390,8 @@ export default function FichePage() {
       // Recharger les cartes après la génération
       await fetchCards();
     } catch (error) {
-      console.error('❌ Erreur:', error);
-      toast.error('Erreur lors de la génération des cartes 02', error);
+      console.error('❌ Erreur 02:', error);
+      toast.error('Erreur lors de la génération des cartes 02');
     } finally {
       setIsLoadingCards(false);
     }
