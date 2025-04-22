@@ -383,7 +383,7 @@ export default function FichePage() {
       });
 
       if (!response.ok) {
-        throw new Error('Erreur lors de la génération des cartes O1', response);
+        throw new Error('Erreur lors de la génération des cartes O1');
       }
 
       toast.success('Cartes générées avec succès !');
