@@ -90,7 +90,7 @@ export default function MatierePage() {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ficheName, setFicheName] = useState<string>('');
-  const [isProgressSheetOpen, setIsProgressSheetOpen] = useState(false);
+  const [isBottomSheetOpen, setIsBottomSheetOpen] = useState(false);
   const [steps, setSteps] = useState([
     { id: 'analyse', label: 'Analyse du document', status: 'pending' },
     { id: 'creation', label: 'Création de la fiche', status: 'pending' },
@@ -329,21 +329,38 @@ export default function MatierePage() {
     }
 
     setIsLessonSheetOpen(false);
-    setIsProgressSheetOpen(true);
+    setIsBottomSheetOpen(true);
     setUploading(true);
     setError(null);
 
     // Étape 1: Analyse du document
     updateStepStatus('analyse', 'loading');
-    const formData = new FormData();
-    formData.append('file', selectedFile);
-    formData.append('matiereId', params.id.toString());
-    formData.append('niveauEtude', niveauEtude.toString());
-    formData.append('language', language.toString());
-    formData.append('size', size.toString());
-
+    
     try {
-      const response = await fetch('/api/analyze', {
+      // Récupérer l'utilisateur actuel
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        toast.error('Vous devez être connecté pour analyser un document');
+        return;
+      }
+
+      // Récupérer le nombre initial de fiches
+      const { count: initialCount } = await supabase
+        .from('fiches')
+        .select('*', { count: 'exact', head: true })
+        .eq('matiere_id', params.id);
+
+      const formData = new FormData();
+      formData.append('file', selectedFile);
+      formData.append('matiereId', params.id.toString());
+      formData.append('niveauEtude', niveauEtude.toString());
+      formData.append('language', language.toString());
+      formData.append('size', size.toString());
+      formData.append('userId', user.id);
+      formData.append('nom', ficheName);
+
+      const response = await fetch('https://n8n-tb3a.onrender.com/webhook/8c28ab02-e3ae-4aab-ae89-5a182032aa9d', {
         method: 'POST',
         body: formData
       });
@@ -352,78 +369,45 @@ export default function MatierePage() {
         throw new Error(await response.text());
       }
 
-      const analyzeData = await response.json();
-      updateStepStatus('analyse', 'completed');
 
-      // Étape 2: Création de la fiche
-      updateStepStatus('creation', 'loading');
-      const createFicheFormData = new FormData();
-      createFicheFormData.append('assistantId', analyzeData.assistantId.toString());
-      createFicheFormData.append('fileId', analyzeData.fileId.toString());
-      createFicheFormData.append('vectorStoreId', analyzeData.vectorStoreId.toString());
-      createFicheFormData.append('storageDataPath', analyzeData.storagePath.toString());
-      createFicheFormData.append('language', language.toString());
-      createFicheFormData.append('size', size.toString());
-      createFicheFormData.append('niveauEtude', niveauEtude.toString());
-      createFicheFormData.append('matiereId', params.id.toString());
+      // Boucle de vérification
+      let isCompleted = false;
+      for (let i = 0; i < 10 && !isCompleted; i++) {
+        // Attendre 10 secondes
+        await new Promise(resolve => setTimeout(resolve, 10000));
 
-      const createFicheResponse = await fetch('/api/createFiche', {
-        method: 'POST',
-        body: createFicheFormData
-      });
+        // Vérifier le nouveau nombre de fiches
+        const { count: currentCount } = await supabase
+          .from('fiches')
+          .select('*', { count: 'exact', head: true })
+          .eq('matiere_id', params.id);
 
-      if (!createFicheResponse.ok) {
-        throw new Error(await createFicheResponse.text());
+        console.log(`📊 Vérification ${i + 1}/10 - Fiches initiales: ${initialCount}, Fiches actuelles: ${currentCount}`);
+
+        if (currentCount !== null && initialCount !== null && currentCount > initialCount) {
+          updateStepStatus('analyse', 'completed');
+          setIsBottomSheetOpen(false);
+          
+          // Rafraîchir la liste des fiches
+          const { data: newFiches, error: fetchError } = await supabase
+            .from('fiches')
+            .select('id, nom, created_at')
+            .eq('matiere_id', params.id)
+            .order('created_at', { ascending: false });
+
+          if (!fetchError && newFiches) {
+            setFiches(newFiches);
+          }
+
+          isCompleted = true;
+          break;
+        }
       }
 
-      const createFicheData = await createFicheResponse.json();
-      updateStepStatus('creation', 'completed');
-
-      // Étape 3: Mise en forme de la fiche
-      updateStepStatus('miseEnForme', 'loading');
-      const miseEnFormeResponse = await fetch('/api/miseEnFormeFiche', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          threadId: createFicheData.threadId,
-          runId: createFicheData.runId,
-          matiereId: params.id,
-          ficheName: ficheName,
-          assistantId: analyzeData.assistantId,
-          vectorStoreId: analyzeData.vectorStoreId,
-          fileId: analyzeData.fileId,
-          language: language
-        })
-      });
-
-      if (!miseEnFormeResponse.ok) {
-        throw new Error(await miseEnFormeResponse.text());
+      if (!isCompleted) {
+        console.warn('⚠️ Le nombre de fiches n\'a pas changé après 10 tentatives');
+        toast.error('La génération de la fiche prend plus de temps que prévu');
       }
-
-      updateStepStatus('miseEnForme', 'completed');
-      
-      // Rafraîchir la liste des fiches
-      const { data: newFiches, error: fetchError } = await supabase
-        .from('fiches')
-        .select('id, nom, created_at')
-        .eq('matiere_id', params.id)
-        .order('created_at', { ascending: false });
-
-      if (fetchError) {
-        console.error('❌ Erreur lors de la récupération des fiches:', fetchError);
-      } else {
-        setFiches(newFiches || []);
-      }
-
-      // Fermer la modal de progression et réinitialiser les états
-      setTimeout(() => {
-        setIsProgressSheetOpen(false);
-        setSelectedFile(null);
-        setFicheName('');
-        setSteps(steps.map(step => ({ ...step, status: 'pending' })));
-      }, 1000);
 
     } catch (err: any) {
       console.error('❌ Erreur:', err);
@@ -733,8 +717,8 @@ export default function MatierePage() {
       </BottomSheet>
 
       <BottomSheet
-        isOpen={isProgressSheetOpen}
-        onClose={() => setIsProgressSheetOpen(false)}
+        isOpen={isBottomSheetOpen}
+        onClose={() => setIsBottomSheetOpen(false)}
         title="Création de la fiche en cours"
       >
         <div className="p-4 space-y-6">

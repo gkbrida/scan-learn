@@ -11,6 +11,7 @@ export default function LoginButton() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -34,10 +35,22 @@ export default function LoginButton() {
 
       if (error) {
         if (error.message === 'Invalid login credentials') {
+          setNotification({
+            message: 'Email ou mot de passe incorrect',
+            type: 'error'
+          });
           toast.error('Email ou mot de passe incorrect');
-        } else if (error.message.includes('Email not confirmed')) {
+        } else if (error.message.includes('Email not confirmed') || error.message === 'Email not confirmed') {
+          setNotification({
+            message: 'Veuillez confirmer votre email avant de vous connecter',
+            type: 'error'
+          });
           toast.error('Veuillez confirmer votre email avant de vous connecter');
         } else {
+          setNotification({
+            message: 'Une erreur est survenue lors de la connexion',
+            type: 'error'
+          });
           toast.error('Une erreur est survenue lors de la connexion');
         }
         console.log('❌ Détails de l\'erreur:', error.message);
@@ -92,6 +105,11 @@ export default function LoginButton() {
 
   return (
     <div className="w-full space-y-8">
+      {notification && (
+        <div className={`p-4 rounded-lg ${notification.type === 'error' ? 'bg-red-500' : 'bg-green-500'}`}>
+          <p className="text-white">{notification.message}</p>
+        </div>
+      )}
       <form onSubmit={handleEmailLogin} className="space-y-6">
         <div>
           <label htmlFor="email" className="block text-base font-medium text-gray-700 mb-2">

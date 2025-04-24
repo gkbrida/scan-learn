@@ -56,7 +56,6 @@ export default function RegisterPage() {
           emailRedirectTo: `${window.location.origin}/auth/callback?next=/auth/login`,
         },
       });
-
       // Si l'utilisateur existe déjà (Supabase retourne data.user comme null dans ce cas)
       if (data?.user === null) {
         setNotification({

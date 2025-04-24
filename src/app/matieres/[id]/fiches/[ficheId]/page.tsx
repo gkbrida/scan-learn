@@ -1,10 +1,36 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { createBrowserClient } from '@supabase/ssr';
 import { toast } from 'react-hot-toast';
 import BottomSheet from '@/app/components/BottomSheet';
+import CarteMemo from '@/app/components/CarteMemo';
+import Script from 'next/script';
+
+// Déclaration des types pour MathJax
+declare global {
+  interface Window {
+    MathJax?: {
+      typesetPromise?: () => Promise<void>;
+      tex?: {
+        inlineMath: string[][];
+        displayMath: string[][];
+        processEscapes: boolean;
+        packages: string[];
+      };
+      options?: {
+        enableMenu: boolean;
+        skipHtmlTags: string[];
+        processHtmlClass: string;
+      };
+      startup?: {
+        typeset: boolean;
+        ready: () => void;
+      };
+    };
+  }
+}
 
 if (!process.env.NEXT_PUBLIC_SUPABASE_URL) throw new Error('NEXT_PUBLIC_SUPABASE_URL is required');
 if (!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) throw new Error('NEXT_PUBLIC_SUPABASE_ANON_KEY is required');
@@ -19,8 +45,14 @@ interface Fiche {
   nom: string;
   contenu: string;
   created_at: string;
-  vector_store_id: string;
   language: string;
+  file_id: string;
+}
+
+interface OpenAI {
+  id: string;
+  assistant_id: string;
+  vectorstore_id: string;
 }
 
 interface CarteMemo {
@@ -250,18 +282,85 @@ export default function FichePage() {
   const ficheId = params?.ficheId as string;
   const [activeTab, setActiveTab] = useState<'fiche' | 'cartes'>('fiche');
   const [fiche, setFiche] = useState<Fiche | null>(null);
+  const [openAI, setOpenAI] = useState<OpenAI | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingCards, setIsLoadingCards] = useState(false);
   const [isLoadingQuiz, setIsLoadingQuiz] = useState(false);
   const [hasQuiz, setHasQuiz] = useState(false);
   const [cartesMemo, setCartesMemo] = useState<CarteMemo[]>([]);
   const [isFicheOptionsOpen, setIsFicheOptionsOpen] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const mathJaxLoaded = useRef(false);
 
-  // Fonction pour nettoyer le contenu des cartes
+  // Fonction pour nettoyer le contenu des cartes et formater les formules
   const cleanCardContent = (content: string | null) => {
     if (!content) return '';
-    return content.replace(/```html\n?/g, '').replace(/```\n?/g, '');
+    let cleanContent = content.replace(/```html\n?/g, '').replace(/```\n?/g, '');
+    
+    // Traiter les formules mathématiques
+    cleanContent = cleanContent.replace(/\\\((.*?)\\\)/g, (match, formula) => {
+      return `\\(${formula.trim()}\\)`;
+    });
+    
+    cleanContent = cleanContent.replace(/\\\[(.*?)\\\]/g, (match, formula) => {
+      return `\\[${formula.trim()}\\]`;
+    });
+
+    return cleanContent;
   };
+
+  useEffect(() => {
+    // Charger MathJax
+    if (!mathJaxLoaded.current) {
+      const script = document.createElement('script');
+      script.src = 'https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js';
+      script.async = true;
+      script.id = 'MathJax-script';
+      
+      const config = {
+        tex: {
+          inlineMath: [['\\(', '\\)']],
+          displayMath: [['\\[', '\\]']],
+          processEscapes: true,
+          packages: ['base', 'ams', 'noerrors', 'noundefined']
+        },
+        options: {
+          enableMenu: false,
+          skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code'],
+          processHtmlClass: 'fiche-content'
+        },
+        startup: {
+          typeset: false,
+          ready: () => {
+            console.log('✅ MathJax est prêt');
+            (window as any).MathJax?.typesetPromise?.();
+          }
+        }
+      };
+
+      window.MathJax = config;
+      document.head.appendChild(script);
+      mathJaxLoaded.current = true;
+    }
+  }, []);
+
+  // Effet pour retraiter les formules quand le contenu change
+  useEffect(() => {
+    const typeset = async () => {
+      if (window.MathJax?.typesetPromise && fiche?.contenu) {
+        try {
+          await window.MathJax.typesetPromise();
+        } catch (err) {
+          console.error('❌ Erreur lors du traitement des formules:', err);
+        }
+      }
+    };
+
+    // Attendre un peu pour s'assurer que le contenu est rendu
+    const timeoutId = setTimeout(typeset, 100);
+    return () => clearTimeout(timeoutId);
+  }, [fiche?.contenu]);
 
   useEffect(() => {
     // Injecter les styles dans le head
@@ -356,29 +455,34 @@ export default function FichePage() {
   };
 
   
-
-  
-
   // Charger les cartes au montage du composant
   useEffect(() => {
-    
     fetchCards();
   }, [ficheId]);
 
   const handleGenerateCards = async () => {
-    if (!ficheId) return;
-
-    setIsLoadingCards(true);
+    setIsGenerating(true);
+    setError(null);
+    
     try {
-      const response = await fetch('/api/generateCards', {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        toast.error('Vous devez être connecté pour générer des cartes mémo');
+        return;
+      }
+
+      const response = await fetch('https://n8n-tb3a.onrender.com/webhook/c6598750-8b44-44b4-8c1c-f17bfcd97da4', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           ficheId: ficheId,
-          vectorStoreId: fiche?.vector_store_id,
-          language: fiche?.language
+          language: fiche?.language,
+          matiereId: id,
+          userId: user.id,
+          fileId: fiche?.file_id
         }),
       });
 
@@ -398,7 +502,7 @@ export default function FichePage() {
   };
 
   const handleGenerateQuiz = async () => {
-    if (!ficheId || !fiche?.vector_store_id || !id) {
+    if (!ficheId || !id) {
       toast.error('Données manquantes pour la génération du quiz');
       return;
     }
@@ -412,17 +516,17 @@ export default function FichePage() {
         return;
       }
 
-      const response = await fetch('/api/generateQuiz', {
+      const response = await fetch('https://n8n-tb3a.onrender.com/webhook/b955d692-5779-41fd-8725-63c1db99b7e6', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           ficheId: ficheId,
-          vectorStoreId: fiche.vector_store_id,
-          language: fiche.language,
+          language: fiche?.language,
           matiereId: id,
-          userId: user.id
+          userId: user.id,
+          fileId: fiche?.file_id
         }),
       });
 
@@ -430,13 +534,38 @@ export default function FichePage() {
         throw new Error('Erreur lors de la génération du quiz');
       }
 
-      toast.success('Quiz généré avec succès !');
-      // Redirection vers la page du quiz
-      router.push(`/matieres/${id}/fiches/${ficheId}/quiz`);
+      // Boucle de vérification des quiz
+      let isCompleted = false;
+      for (let i = 0; i < 10 && !isCompleted; i++) {
+        // Attendre 10 secondes
+        await new Promise(resolve => setTimeout(resolve, 10000));
+
+        // Vérifier le nombre de quiz
+        const { count: quizCount } = await supabase
+          .from('qcm')
+          .select('*', { count: 'exact', head: true })
+          .eq('fiche_id', ficheId);
+
+        console.log(`📊 Vérification ${i + 1}/10 - Nombre de quiz: ${quizCount}`);
+
+        if (quizCount !== null && quizCount >= 10) {
+          setIsLoadingQuiz(false);
+          toast.success('Quiz générés avec succès !');
+          router.push(`/matieres/${id}/fiches/${ficheId}/quiz`);
+          isCompleted = true;
+          break;
+        }
+      }
+
+      if (!isCompleted) {
+        console.warn('⚠️ Le nombre de quiz n\'a pas atteint 20 après 10 tentatives');
+        setIsLoadingQuiz(false);
+        toast.error('La génération des quiz prend plus de temps que prévu');
+      }
+
     } catch (error) {
       console.error('❌ Erreur:', error);
       toast.error('Erreur lors de la génération du quiz');
-    } finally {
       setIsLoadingQuiz(false);
     }
   };
@@ -475,22 +604,31 @@ export default function FichePage() {
           ))}
         </div>
       );
+    }else{
+      return (
+        <div className="flex flex-col items-center justify-center py-4">
+          <p className="text-gray-600 mb-4">
+            Aucune carte mémo n'a encore été générée pour cette fiche.
+          </p>
+          <button
+            onClick={handleGenerateCards}
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+            disabled={isGenerating}
+          >
+            {isGenerating ? (
+              <div className="flex items-center justify-center space-x-2">
+                <div className="w-5 h-5 border-t-2 border-white rounded-full animate-spin"></div>
+                <span>Génération en cours...</span>
+              </div>
+            ) : (
+              'Générer les cartes mémo'
+            )}
+          </button>
+        </div>
+      );
     }
 
-    return (
-      <div className="flex flex-col items-center justify-center py-4">
-        <p className="text-gray-600 mb-4">
-          Aucune carte mémo n'a encore été générée pour cette fiche.
-        </p>
-        <button
-          onClick={handleGenerateCards}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-          disabled={isLoadingCards}
-        >
-          Générer les cartes mémo
-        </button>
-      </div>
-    );
+    
   };
   const handleDeleteFiche = async () => {
     if (!fiche || !id) return;
@@ -566,7 +704,6 @@ export default function FichePage() {
 
   return (
     <div className="min-h-screen bg-white pb-24">
-      {/* Header */}
       <div className="sticky top-0 z-10 bg-white">
         <div className="max-w-4xl mx-auto px-4">
           <div className="flex items-center h-16 justify-between">
@@ -591,7 +728,6 @@ export default function FichePage() {
             </button>
           </div>
 
-          {/* Tabs */}
           <div className="flex space-x-8">
             <button
               onClick={() => setActiveTab('fiche')}
@@ -623,19 +759,28 @@ export default function FichePage() {
         </div>
       </div>
 
-      {/* Content */}
       <div className="max-w-4xl mx-auto px-4 py-6">
         {activeTab === 'fiche' ? (
-          <div 
-            className="fiche-content"
-            dangerouslySetInnerHTML={{ __html: fiche?.contenu ? cleanCardContent(fiche.contenu) : '' }}
-          />
-        ) : (
-          renderCardsTab()
-        )}
+          <div className="grid grid-cols-1 gap-6">
+            <div className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-lg transition-shadow duration-300">
+              <div className="bg-blue-50 px-6 py-4">
+                <h3 className="text-xl font-semibold text-gray-900">
+                  {fiche.nom}
+                </h3>
+              </div>
+              <div className="px-6 py-4">
+                <div 
+                  className="prose max-w-none fiche-content"
+                  dangerouslySetInnerHTML={{ 
+                    __html: fiche?.contenu ? cleanCardContent(fiche.contenu) : '' 
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+        ) : renderCardsTab()}
       </div>
 
-      {/* Bottom Button */}
       <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-200">
         <div className="max-w-4xl mx-auto">
           <button 
@@ -659,7 +804,6 @@ export default function FichePage() {
         </div>
       </div>
 
-      {/* Bottom Sheet for Fiche Options */}
       <BottomSheet
         isOpen={isFicheOptionsOpen}
         onClose={() => setIsFicheOptionsOpen(false)}
@@ -689,4 +833,4 @@ export default function FichePage() {
       </BottomSheet>
     </div>
   );
-} 
+}
