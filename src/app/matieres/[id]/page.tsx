@@ -344,6 +344,14 @@ export default function MatierePage() {
         toast.error('Vous devez être connecté pour analyser un document');
         return;
       }
+      let tailleDocument = "";
+      if(size.toString() === "Court") {
+        tailleDocument = "Peu de details";
+      } else if(size.toString() === "Moyen") {
+        tailleDocument = "un niveau de détail moyen";
+      } else if(size.toString() === "Grand") {
+        tailleDocument = "beaucoup de details";
+      }
 
       // Récupérer le nombre initial de fiches
       const { count: initialCount } = await supabase
@@ -356,7 +364,7 @@ export default function MatierePage() {
       formData.append('matiereId', params.id.toString());
       formData.append('niveauEtude', niveauEtude.toString());
       formData.append('language', language.toString());
-      formData.append('size', size.toString());
+      formData.append('size', tailleDocument );
       formData.append('userId', user.id);
       formData.append('nom', ficheName);
 
@@ -366,6 +374,11 @@ export default function MatierePage() {
       });
 
       if (!response.ok) {
+        await fetch('https://n8n-tb3a.onrender.com/webhook/2165463d-9c0b-4045-b127-b6a8585c08d2', {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' },
+         
+        });
         throw new Error(await response.text());
       }
 
@@ -405,11 +418,19 @@ export default function MatierePage() {
       }
 
       if (!isCompleted) {
+        await fetch('https://n8n-tb3a.onrender.com/webhook/2165463d-9c0b-4045-b127-b6a8585c08d2', {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' }
+        });
         console.warn('⚠️ Le nombre de fiches n\'a pas changé après 10 tentatives');
         toast.error('La génération de la fiche prend plus de temps que prévu');
       }
 
     } catch (err: any) {
+      await fetch('https://n8n-tb3a.onrender.com/webhook/2165463d-9c0b-4045-b127-b6a8585c08d2', {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' }
+      });
       console.error('❌ Erreur:', err);
       setError(err.message || 'Une erreur est survenue');
     } finally {

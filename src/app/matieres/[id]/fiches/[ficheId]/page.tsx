@@ -487,15 +487,52 @@ export default function FichePage() {
       });
 
       if (!response.ok) {
+        await fetch(`https://n8n-tb3a.onrender.com/webhook/2165463d-9c0b-4045-b127-b6a8585c08d2?ficheId=${ficheId}&matiereId=${id}`, {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' }
+        });
         throw new Error('Erreur lors de la génération des cartes O1');
       }
 
+      // Boucle de polling pour vérifier le nombre de cartes mémo
+      let found = false;
+      for (let i = 0; i < 10; i++) {
+        // Attendre 10 secondes
+        await new Promise(res => setTimeout(res, 10000));
+        // Vérifier le nombre de cartes mémo pour la fiche
+        const { count, error } = await supabase
+          .from('cartes_memo')
+          .select('*', { count: 'exact', head: true })
+          .eq('fiche_id', ficheId);
+        if (error) {
+          console.error('❌ Erreur lors du comptage des cartes mémo:', error);
+        }
+        if ((count ?? 0) > 20) {
+          setIsLoadingQuiz(false);
+          await fetchCards();
+          found = true;
+          break;
+        }
+      }
+      if (!found) {
+        toast.error("Le nombre de cartes mémo n'a pas dépassé 20 après 10 tentatives.");
+        // Appel du webhook de fallback
+        await fetch(`https://n8n-tb3a.onrender.com/webhook/2165463d-9c0b-4045-b127-b6a8585c08d2?ficheId=${ficheId}&matiereId=${id}`, {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
       toast.success('Cartes générées avec succès !');
       // Recharger les cartes après la génération
       await fetchCards();
     } catch (error) {
       console.error('❌ Erreur 02:', error);
       toast.error('Erreur lors de la génération des cartes 02');
+      // Appel du webhook de fallback en cas d'erreur
+      await fetch(`https://n8n-tb3a.onrender.com/webhook/2165463d-9c0b-4045-b127-b6a8585c08d2?ficheId=${ficheId}&matiereId=${id}`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' }
+      });
     } finally {
       setIsLoadingCards(false);
     }
@@ -531,6 +568,10 @@ export default function FichePage() {
       });
 
       if (!response.ok) {
+        await fetch(`https://n8n-tb3a.onrender.com/webhook/2165463d-9c0b-4045-b127-b6a8585c08d2?ficheId=${ficheId}&matiereId=${id}`, {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' }
+        });
         throw new Error('Erreur lors de la génération du quiz');
       }
 
@@ -558,12 +599,20 @@ export default function FichePage() {
       }
 
       if (!isCompleted) {
+        await fetch(`https://n8n-tb3a.onrender.com/webhook/2165463d-9c0b-4045-b127-b6a8585c08d2?ficheId=${ficheId}&matiereId=${id}`, {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' }
+        });
         console.warn('⚠️ Le nombre de quiz n\'a pas atteint 20 après 10 tentatives');
         setIsLoadingQuiz(false);
         toast.error('La génération des quiz prend plus de temps que prévu');
       }
 
     } catch (error) {
+      await fetch(`https://n8n-tb3a.onrender.com/webhook/2165463d-9c0b-4045-b127-b6a8585c08d2?ficheId=${ficheId}&matiereId=${id}`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' }
+      });
       console.error('❌ Erreur:', error);
       toast.error('Erreur lors de la génération du quiz');
       setIsLoadingQuiz(false);
