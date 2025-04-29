@@ -44,7 +44,7 @@ interface Fiche {
 const OPTIONS = [
   {
     id: 'fiche',
-    name: 'Avec ta fiche',
+    name: 'Avec tes cours images',
     description: 'Prends en photo ta fiche manuscrite',
     icon: (
       <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -55,21 +55,11 @@ const OPTIONS = [
   },
   {
     id: 'cours',
-    name: 'Avec tes cours',
+    name: 'Avec tes cours pdf',
     description: 'Importe un PDF de ton cours',
     icon: (
       <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-      </svg>
-    )
-  },
-  {
-    id: 'ia',
-    name: 'Avec l\'IA',
-    description: 'Génère une fiche à partir d\'un thème',
-    icon: (
-      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
       </svg>
     )
   }
@@ -82,14 +72,16 @@ export default function MatierePage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isCreateSheetOpen, setIsCreateSheetOpen] = useState(false);
   const [isLessonSheetOpen, setIsLessonSheetOpen] = useState(false);
+  const [isLessonImgSheetOpen, setIsLessonImgSheetOpen] = useState(false);
   const [isMatiereOptionsOpen, setIsMatiereOptionsOpen] = useState(false);
-  const [niveauEtude, setNiveauEtude] = useState<string | null>(null);
   const [language, setLanguage] = useState('fr');
   const [size, setSize] = useState('moyenne');
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [selectedImages, setSelectedImages] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ficheName, setFicheName] = useState<string>('');
+  const [ficheNameImg, setFicheNameImg] = useState<string>('');
   const [isBottomSheetOpen, setIsBottomSheetOpen] = useState(false);
   const [steps, setSteps] = useState([
     { id: 'analyse', label: 'Analyse du document', status: 'pending' },
@@ -151,22 +143,7 @@ export default function MatierePage() {
     fetchMatiere();
     fetchFiches();
 
-    const fetchUserInfo = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const { data } = await supabase
-          .from('info_users')
-          .select('niveau_etude')
-          .eq('user_id', user.id)
-          .single();
-        
-        if (data) {
-          setNiveauEtude(data.niveau_etude);
-        }
-      }
-    };
 
-    fetchUserInfo();
   }, [params?.id]);
 
   const calculateProgress = async () => {
@@ -215,15 +192,26 @@ export default function MatierePage() {
     setIsCreateSheetOpen(false);
     switch (option) {
       case 'fiche':
-        try {
-          const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-          stream.getTracks().forEach(track => track.stop());
-          if (params?.id) {
-            router.push(`/matieres/${params.id}/scan`);
+        const inputimg = document.createElement('input');
+        inputimg.type = 'file';
+        inputimg.accept = 'image/*';
+        inputimg.onchange = async (e) => {
+          const images = Array.from((e.target as HTMLInputElement).files || []);
+          if (images.length > 10) {
+            setError('Vous pouvez sélectionner jusqu’à 10 images maximum.');
+                            return;
           }
-        } catch (error) {
-          alert("L'accès à la caméra a été refusé");
-        }
+          const invalid = images.find(image => !image.type.startsWith('image/'));
+          if (invalid) {
+            setError('Seules les images sont autorisées.');
+            return;
+          }
+          setSelectedImages(images);
+          setError(null);
+          setIsLessonImgSheetOpen(true);
+        };
+        inputimg.click();
+        
         break;
       
       case 'cours':
@@ -237,7 +225,7 @@ export default function MatierePage() {
               alert("Le fichier est trop volumineux (max 10Mo)");
               return;
             }
-            setSelectedFile(file);
+            setSelectedFiles([file]);
             setError(null);
             setIsLessonSheetOpen(true);
           }
@@ -323,7 +311,7 @@ export default function MatierePage() {
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     
-    if (!selectedFile || !niveauEtude || !language || !size || !params?.id) {
+    if (selectedFiles.length === 0  || !language || !size || !params?.id) {
       setError('Veuillez remplir tous les champs requis');
       return;
     }
@@ -345,12 +333,12 @@ export default function MatierePage() {
         return;
       }
       let tailleDocument = "";
-      if(size.toString() === "Court") {
-        tailleDocument = "Peu de details";
-      } else if(size.toString() === "Moyen") {
-        tailleDocument = "un niveau de détail moyen";
-      } else if(size.toString() === "Grand") {
-        tailleDocument = "beaucoup de details";
+      if(size.toString() === "petite") {
+        tailleDocument = "Create an ultra-concise sheet that goes straight to the point";
+      } else if(size.toString() === "moyenne") {
+        tailleDocument = "Create a balanced sheet, striking the right balance between conciseness and detail";
+      } else if(size.toString() === "grande") {
+        tailleDocument = "Create a complete and detailed sheet for thorough understanding";
       }
 
       // Récupérer le nombre initial de fiches
@@ -360,11 +348,12 @@ export default function MatierePage() {
         .eq('matiere_id', params.id);
 
       const formData = new FormData();
-      formData.append('file', selectedFile);
+      selectedFiles.forEach((file, idx) => {
+        formData.append('file', file);
+      });
       formData.append('matiereId', params.id.toString());
-      formData.append('niveauEtude', niveauEtude.toString());
       formData.append('language', language.toString());
-      formData.append('size', tailleDocument );
+      formData.append('size', tailleDocument);
       formData.append('userId', user.id);
       formData.append('nom', ficheName);
 
@@ -437,6 +426,127 @@ export default function MatierePage() {
       setUploading(false);
     }
   };
+
+  const handleSubmitImg = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    
+    if (selectedImages.length === 0  || !language || !size || !params?.id) {
+      setError('Veuillez remplir tous les champs requis');
+      return;
+    }
+
+    setIsLessonImgSheetOpen(false);
+    setIsBottomSheetOpen(true);
+    setUploading(true);
+    setError(null);
+
+    // Étape 1: Analyse du document
+    updateStepStatus('analyse', 'loading');
+    
+    try {
+      // Récupérer l'utilisateur actuel
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        toast.error('Vous devez être connecté pour analyser un document');
+        return;
+      }
+      let tailleDocument = "";
+      if(size.toString() === "petite") {
+        tailleDocument = "Create an ultra-concise sheet that goes straight to the point";
+      } else if(size.toString() === "moyenne") {
+        tailleDocument = "Create a balanced sheet, striking the right balance between conciseness and detail";
+      } else if(size.toString() === "grande") {
+        tailleDocument = "Create a complete and detailed sheet for thorough understanding";
+      }
+
+      // Récupérer le nombre initial de fiches
+      const { count: initialCount } = await supabase
+        .from('fiches')
+        .select('*', { count: 'exact', head: true })
+        .eq('matiere_id', params.id);
+
+      const formData = new FormData();
+      selectedImages.forEach((image, idx) => {
+        formData.append(`image${idx + 1}`, image);
+      });
+      formData.append('matiereId', params.id.toString());
+      formData.append('language', language.toString());
+      formData.append('size', tailleDocument);
+      formData.append('userId', user.id);
+      formData.append('nom', ficheNameImg);
+      formData.append('nbImg', selectedImages.length.toString());
+
+      const response = await fetch('https://n8n-tb3a.onrender.com/webhook/0fcc4406-8845-4a36-a3d8-f135f2fba20f', {
+        method: 'POST',
+        body: formData
+      });
+
+      if (!response.ok) {
+        await fetch('https://n8n-tb3a.onrender.com/webhook/2165463d-9c0b-4045-b127-b6a8585c08d2', {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' },
+         
+        });
+        throw new Error(await response.text());
+      }
+
+
+      // Boucle de vérification
+      let isCompleted = false;
+      for (let i = 0; i < 10 && !isCompleted; i++) {
+        // Attendre 10 secondes
+        await new Promise(resolve => setTimeout(resolve, 10000));
+
+        // Vérifier le nouveau nombre de fiches
+        const { count: currentCount } = await supabase
+          .from('fiches')
+          .select('*', { count: 'exact', head: true })
+          .eq('matiere_id', params.id);
+
+        console.log(`📊 Vérification ${i + 1}/10 - Fiches initiales: ${initialCount}, Fiches actuelles: ${currentCount}`);
+
+        if (currentCount !== null && initialCount !== null && currentCount > initialCount) {
+          updateStepStatus('analyse', 'completed');
+          setIsBottomSheetOpen(false);
+          
+          // Rafraîchir la liste des fiches
+          const { data: newFiches, error: fetchError } = await supabase
+            .from('fiches')
+            .select('id, nom, created_at')
+            .eq('matiere_id', params.id)
+            .order('created_at', { ascending: false });
+
+          if (!fetchError && newFiches) {
+            setFiches(newFiches);
+          }
+
+          isCompleted = true;
+          break;
+        }
+      }
+
+      if (!isCompleted) {
+        await fetch('https://n8n-tb3a.onrender.com/webhook/2165463d-9c0b-4045-b127-b6a8585c08d2', {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        console.warn('⚠️ Le nombre de fiches n\'a pas changé après 10 tentatives');
+        toast.error('La génération de la fiche prend plus de temps que prévu');
+      }
+
+    } catch (err: any) {
+      await fetch('https://n8n-tb3a.onrender.com/webhook/2165463d-9c0b-4045-b127-b6a8585c08d2', {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      console.error('❌ Erreur:', err);
+      setError(err.message || 'Une erreur est survenue');
+    } finally {
+      setUploading(false);
+    }
+  };
+
 
   if (isLoading) {
     return (
@@ -519,10 +629,22 @@ export default function MatierePage() {
                   className="p-4 bg-gray-50 rounded-xl flex items-center justify-between cursor-pointer hover:bg-gray-100 transition-colors"
                 >
                   <div className="flex items-center space-x-3">
-                    <svg className="w-6 h-6 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    <svg 
+                      className="h-8 w-8 text-gray-500 mr-4" 
+                      fill="none" 
+                      viewBox="0 0 24 24" 
+                      stroke="currentColor"
+                    >
+                      <path 
+                        strokeLinecap="round" 
+                        strokeLinejoin="round" 
+                        strokeWidth={2} 
+                        d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" 
+                      />
                     </svg>
-                    <span className="font-medium">{fiche.nom}</span>
+                    <div>
+                      <p className="text-sm font-medium text-gray-900">{fiche.nom}</p>
+                    </div>
                   </div>
                   <span className="text-sm text-gray-500">
                     {new Date(fiche.created_at).toLocaleDateString()}
@@ -611,9 +733,9 @@ export default function MatierePage() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Fichier PDF
+                PDF de la fiche
               </label>
-              {!selectedFile ? (
+              {selectedFiles.length === 0 ? (
                 <div 
                   className="relative border-2 border-dashed border-gray-300 rounded-lg p-6 hover:border-blue-500 transition-colors cursor-pointer"
                   onClick={() => document.getElementById('file-input')?.click()}
@@ -622,17 +744,21 @@ export default function MatierePage() {
                     type="file"
                     id="file-input"
                     accept=".pdf"
+                    multiple
                     className="hidden"
                     onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) {
-                        if (file.size > 10 * 1024 * 1024) {
-                          setError('Le fichier est trop volumineux (maximum 10 Mo)');
-                          return;
-                        }
-                        setSelectedFile(file);
-                        setError(null);
+                      const files = Array.from(e.target.files || []);
+                      if (files.length > 10) {
+                        setError('Vous pouvez sélectionner jusqu’à 10 images maximum.');
+                        return;
                       }
+                      const invalid = files.find(file => !file.type.startsWith('.pdf'));
+                      if (invalid) {
+                        setError('Seules les images sont autorisées.');
+                        return;
+                      }
+                      setSelectedFiles(files);
+                      setError(null);
                     }}
                   />
                   <div className="text-center">
@@ -640,36 +766,53 @@ export default function MatierePage() {
                       <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4-4m4-24h8m-4-4v8m-12 4h.02" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
                     <div className="flex text-sm text-gray-600 mt-4 justify-center">
-                      <div className="text-blue-600 hover:text-blue-500">Sélectionner un fichier</div>
+                      <div className="text-blue-600 hover:text-blue-500">Sélectionner des images</div>
                       <p className="pl-1">ou glisser-déposer</p>
                     </div>
-                    <p className="text-xs text-gray-500 mt-2">PDF jusqu'à 10MB</p>
+                    <p className="text-xs text-gray-500 mt-2">Jusqu'à 10 images (jpg, png, ...)</p>
                   </div>
                 </div>
               ) : (
-                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                  <div className="flex items-center">
-                    <svg className="h-8 w-8 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                    </svg>
-                    <div className="ml-4">
-                      <p className="text-sm font-medium text-gray-900">{selectedFile.name}</p>
-                      <p className="text-sm text-gray-500">{(selectedFile.size / 1024 / 1024).toFixed(2)} Mo</p>
+                <div className="space-y-2">
+                  {selectedFiles.map((file, idx) => (
+                    <div key={file.name } className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                      <div className="flex items-center">
+                        <svg 
+                          className="h-8 w-8 text-gray-500 mr-4" 
+                          fill="none" 
+                          viewBox="0 0 24 24" 
+                          stroke="currentColor"
+                        >
+                          <path 
+                            strokeLinecap="round" 
+                            strokeLinejoin="round" 
+                            strokeWidth={2} 
+                            d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" 
+                          />
+                        </svg>
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">{file.name}</p>
+                          <p className="text-sm text-gray-500">{(file.size / 1024 / 1024).toFixed(2)} Mo</p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const newFiles = selectedFiles.filter((_, i) => i !== idx);
+                          setSelectedFiles(newFiles);
+                          if (newFiles.length === 0) {
+                            const input = document.getElementById('file-input') as HTMLInputElement;
+                            if (input) input.value = '';
+                          }
+                        }}
+                        className="ml-4 flex-shrink-0 p-1 rounded-full hover:bg-gray-200 transition-colors"
+                      >
+                        <svg className="h-6 w-6 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
                     </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectedFile(null);
-                      const input = document.getElementById('file-input') as HTMLInputElement;
-                      if (input) input.value = '';
-                    }}
-                    className="ml-4 flex-shrink-0 p-1 rounded-full hover:bg-gray-200 transition-colors"
-                  >
-                    <svg className="h-6 w-6 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
+                  ))}
                 </div>
               )}
             </div>
@@ -713,9 +856,196 @@ export default function MatierePage() {
             <div className="flex justify-end">
               <button
                 type="submit"
-                disabled={uploading || !selectedFile || !ficheName}
+                disabled={uploading || selectedFiles.length === 0 || !ficheName}
                 className={`w-full px-6 py-4 text-white rounded-full text-lg font-medium transition-colors ${
-                  uploading || !selectedFile || !ficheName
+                  uploading || selectedFiles.length === 0 || !ficheName
+                    ? 'bg-gray-400 cursor-not-allowed'
+                    : 'bg-black hover:bg-gray-900'
+                }`}
+              >
+                {uploading ? (
+                  <div className="flex items-center justify-center">
+                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Traitement en cours...
+                  </div>
+                ) : (
+                  'Créer ma fiche'
+                )}
+              </button>
+            </div>
+          </form>
+        </div>
+      </BottomSheet>
+
+
+      <BottomSheet
+        isOpen={isLessonImgSheetOpen}
+        onClose={() => setIsLessonImgSheetOpen(false)}
+        title="Créer une fiche"
+      >
+        <div className="min-h-[calc(100vh-4rem)] bg-white px-4">
+          <form onSubmit={handleSubmitImg} className="space-y-6 py-6">
+            <div>
+              <label htmlFor="ficheNameImg" className="block text-sm font-medium text-gray-700 mb-2">
+                Nom de la fiche
+              </label>
+              <input
+                type="text"
+                id="ficheNameImg"
+                value={ficheNameImg}
+                onChange={(e) => setFicheNameImg(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Entrez le nom de votre document"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Images de la fiche
+              </label>
+              {selectedImages.length === 0 ? (
+                <div 
+                  className="relative border-2 border-dashed border-gray-300 rounded-lg p-6 hover:border-blue-500 transition-colors cursor-pointer"
+                  onClick={() => document.getElementById('file-input-img')?.click()}
+                >
+                  <input
+                    type="file"
+                    id="file-input-img"
+                    accept="image/*"
+                    multiple
+                    className="hidden"
+                    onChange={(e) => {
+                      const images = Array.from(e.target.files || []);
+                      if (images.length > 10) {
+                        setError('Vous pouvez sélectionner jusqu’à 10 images maximum.');
+                        return;
+                      }
+                      const invalid = images.find(image => !image.type.startsWith('image/'));
+                      if (invalid) {
+                        setError('Seules les images sont autorisées.');
+                        return;
+                      }
+                      setSelectedImages(images);
+                      setError(null);
+                    }}
+                  />
+                  <div className="text-center">
+                    <svg className="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
+                      <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4-4m4-24h8m-4-4v8m-12 4h.02" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                    <div className="flex text-sm text-gray-600 mt-4 justify-center">
+                      <div className="text-blue-600 hover:text-blue-500">Sélectionner des images</div>
+                      <p className="pl-1">ou glisser-déposer</p>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-2">Jusqu'à 10 images (jpg, png, ...)</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {selectedImages.map((image, idx) => (
+                    <div key={image.name + idx} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                      <div className="flex items-center">
+                        <img src={URL.createObjectURL(image)} alt={image.name} className="h-8 w-8 object-cover rounded mr-4" />
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">{image.name}</p>
+                          <p className="text-sm text-gray-500">{(image.size / 1024 / 1024).toFixed(2)} Mo</p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const newImages = selectedImages.filter((_, i) => i !== idx);
+                          setSelectedImages(newImages);
+                          if (newImages.length === 0) {
+                            const input = document.getElementById('file-input-img') as HTMLInputElement;
+                            if (input) input.value = '';
+                          }
+                        }}
+                        className="ml-4 flex-shrink-0 p-1 rounded-full hover:bg-gray-200 transition-colors"
+                      >
+                        <svg className="h-6 w-6 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                  ))}
+                  {selectedImages.length < 10 && (
+                    <button
+                      type="button"
+                      className="mt-2 text-blue-600 hover:text-blue-500 text-sm"
+                      onClick={() => {
+                        const input = document.createElement('input');
+                        input.type = 'file';
+                        input.accept = 'image/*';
+                        input.onchange = async (e) => {
+                          const images = Array.from((e.target as HTMLInputElement).files || []);
+                          if (images.length + selectedImages.length > 10) {
+                            setError('Vous pouvez sélectionner jusqu’à 10 images maximum.');
+                            return;
+                          }
+                          const invalid = images.find(image => !image.type.startsWith('image/'));
+                          if (invalid) {
+                            setError('Seules les images sont autorisées.');
+                            return;
+                          }
+                          setSelectedImages([...selectedImages, ...images]);
+                          setError(null);
+                      };
+                      input.click();
+                                    }}
+                    >
+                      Ajouter une image
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Langue de sortie
+                </label>
+                <LanguageSelector 
+                  selectedLanguage={language}
+                  onLanguageSelect={setLanguage}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Taille de la fiche
+                </label>
+                <SizeSelector 
+                  selectedSize={size}
+                  onSizeSelect={setSize}
+                />
+              </div>
+            </div>
+
+            {error && (
+              <div className="rounded-md bg-red-50 p-4">
+                <div className="flex">
+                  <div className="flex-shrink-0">
+                    <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                  <div className="ml-3">
+                    <p className="text-sm text-red-700">{error}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="flex justify-end">
+              <button
+                type="submit"
+                disabled={uploading || selectedImages.length === 0 || !ficheNameImg}
+                className={`w-full px-6 py-4 text-white rounded-full text-lg font-medium transition-colors ${
+                  uploading || selectedImages.length === 0 || !ficheNameImg
                     ? 'bg-gray-400 cursor-not-allowed'
                     : 'bg-black hover:bg-gray-900'
                 }`}

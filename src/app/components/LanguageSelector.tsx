@@ -64,7 +64,7 @@ export default function LanguageSelector({ selectedLanguage, onLanguageSelect }:
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                onLanguageSelect(language.code.toLowerCase());
+                onLanguageSelect(language.name.toLowerCase());
                 setIsOpen(false);
               }}
               className={`w-full p-4 rounded-[20px] flex items-center gap-3 text-[17px] ${

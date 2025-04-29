@@ -49,11 +49,7 @@ interface Fiche {
   file_id: string;
 }
 
-interface OpenAI {
-  id: string;
-  assistant_id: string;
-  vectorstore_id: string;
-}
+
 
 interface CarteMemo {
   id: string;
@@ -61,13 +57,7 @@ interface CarteMemo {
   contenu: string;
 }
 
-interface PageProps {
-  params: {
-    id: string;
-    ficheId: string;
-  };
-  searchParams?: { [key: string]: string | string[] | undefined };
-}
+
 
 const contentStyles = `
   .fiche-content {
@@ -282,7 +272,6 @@ export default function FichePage() {
   const ficheId = params?.ficheId as string;
   const [activeTab, setActiveTab] = useState<'fiche' | 'cartes'>('fiche');
   const [fiche, setFiche] = useState<Fiche | null>(null);
-  const [openAI, setOpenAI] = useState<OpenAI | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingCards, setIsLoadingCards] = useState(false);
   const [isLoadingQuiz, setIsLoadingQuiz] = useState(false);
@@ -466,7 +455,7 @@ export default function FichePage() {
     
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      
+      console.log('💾 Utilisateur connecté:', user);
       if (!user) {
         toast.error('Vous devez être connecté pour générer des cartes mémo');
         return;
