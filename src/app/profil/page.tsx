@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
 import { useRouter } from 'next/navigation';
 import BottomNav from '../components/BottomNav';
+import { toast } from 'sonner';
+
 interface UserProfile {
   prenom: string;
   niveau_etudes: string;
@@ -80,9 +82,19 @@ export default function ProfilPage() {
   const handleDeleteAccount = async () => {
     if (confirm('Êtes-vous sûr de vouloir supprimer votre compte ? Cette action est irréversible.')) {
       try {
-        // Logique de suppression du compte à implémenter
-        console.log('Suppression du compte...');
+        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        if (userError) throw userError;
+        if (!user) {
+          router.push('/auth/login');
+          return;
+        }
+        const {error} = await supabase.from('info_users').delete().eq('user_id', user.id);
+        if (error) throw error;
+        const { error: authError } = await supabase.auth.admin.deleteUser(user.id);
+        if (authError) throw authError;
+        router.push('/auth/login');
       } catch (error) {
+        toast.error('Erreur lors de la suppression du compte:');
         console.error('Erreur lors de la suppression du compte:', error);
       }
     }

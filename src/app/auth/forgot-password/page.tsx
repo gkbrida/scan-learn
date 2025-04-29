@@ -26,7 +26,7 @@ export default function ForgotPasswordPage() {
 
       if (error) throw error;
       
-      setMessage('Un e-mail de réinitialisation a été envoyé à votre adresse.');
+      setMessage('Un e-mail de réinitialisation a été envoyé à votre adresse e-mail si elles est liée à un compte.');
     } catch (error) {
       console.error('Erreur lors de la réinitialisation:', error);
       setMessage('Une erreur est survenue. Veuillez réessayer.');

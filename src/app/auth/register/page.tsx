@@ -48,7 +48,52 @@ export default function RegisterPage() {
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
     );
 
+ try {
+  const { count, error } = await supabase
+    .from('info_users') // ou 'users' selon ta table
+    .select('*', { count: 'exact', head: true })
+    .eq('email', email )
+
+   
+  if (error && error.code !== 'PGRST116') { // erreur autre que "no rows returned"
+    throw error;
+  }
+
+
+  if (count && count > 0) {
+    setNotification({
+      message: 'Un compte existe déjà avec cette adresse email. Veuillez vous connecter.',
+      type: 'info'
+    });
+    setLoading(false);
+    // Rediriger vers la page de connexion après 10 secondes
+    setTimeout(() => {
+      router.push('/auth/login');
+    }, 10000);
+    return;
+  }
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('PGRST116')) {
+      setNotification({
+        message: 'Un compte existe déjà avec cette adresse email. Veuillez vous connecter.',
+        type: 'info'
+      });
+      // Rediriger vers la page de connexion après 3 secondes
+      setTimeout(() => {
+        router.push('/auth/login');
+      }, 10000);
+      return;
+    }
+
+    console.error('Erreur lors de la vérification de l\'existence de l\'utilisateur:', error);
+    setNotification({
+      message: 'Une erreur est survenue lors de la vérification de l\'existence de l\'utilisateur',
+      type: 'error'
+    });
+  }
+
     try {
+    
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
@@ -56,19 +101,8 @@ export default function RegisterPage() {
           emailRedirectTo: `${window.location.origin}/auth/callback?next=/auth/login`,
         },
       });
-      // Si l'utilisateur existe déjà (Supabase retourne data.user comme null dans ce cas)
-      if (data?.user === null) {
-        setNotification({
-          message: 'Un compte existe déjà avec cette adresse email. Veuillez vous connecter.',
-          type: 'info'
-        });
-        
-        // Rediriger vers la page de connexion après 3 secondes
-        setTimeout(() => {
-          router.push('/auth/login');
-        }, 3000);
-        return;
-      }
+      
+      
 
       if (error) throw error;
 
@@ -80,7 +114,8 @@ export default function RegisterPage() {
             {
               user_id: data.user.id,
               prenom: firstName,
-              niveau_etude: educationLevel
+              niveau_etude: educationLevel,
+              email: email
             }
           ]);
 
@@ -122,29 +157,6 @@ export default function RegisterPage() {
     }
   };
 
-  const handleGoogleSignUp = async () => {
-    const supabase = createBrowserClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    );
-
-    try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
-        },
-      });
-
-      if (error) throw error;
-    } catch (error) {
-      console.error('Erreur de connexion Google:', error);
-      setNotification({
-        message: 'Une erreur est survenue lors de la connexion avec Google',
-        type: 'error'
-      });
-    }
-  };
 
   return (
     <div className="min-h-screen bg-white p-4">
@@ -273,30 +285,7 @@ export default function RegisterPage() {
             </div>
           </div>
 
-          <button
-            onClick={handleGoogleSignUp}
-            className="mt-6 w-full flex items-center justify-center py-3 px-4 border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors"
-          >
-            <svg className="h-6 w-6 mr-2" viewBox="0 0 24 24">
-              <path
-                d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                fill="#4285F4"
-              />
-              <path
-                d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                fill="#34A853"
-              />
-              <path
-                d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-                fill="#FBBC05"
-              />
-              <path
-                d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-                fill="#EA4335"
-              />
-            </svg>
-            <span>Google</span>
-          </button>
+          
         </div>
 
         <div className="text-center mt-8">

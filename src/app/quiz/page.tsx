@@ -103,8 +103,26 @@ export default function AllQuizPage() {
 
   if (questions.length === 0) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-white">
-        <p className="text-lg text-black">Aucune question à réviser</p>
+      <div className="min-h-screen bg-white">
+        {/* Header */}
+        <div className="sticky top-0 z-10 bg-white border-b border-gray-200">
+          <div className="max-w-xl mx-auto px-4">
+            <div className="flex items-center h-16">
+              <button
+                onClick={() => router.push('/dashboard')}
+                className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center mr-4"
+              >
+                <svg className="w-6 h-6 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
+              <h1 className="text-xl font-semibold">Flash Quiz</h1>
+            </div>
+          </div>
+        </div>
+        <div className="min-h-screen flex items-center justify-center bg-white">
+          <p className="text-lg text-black">Aucune question à réviser</p>
+        </div> 
       </div>
     );
   }
