@@ -117,7 +117,7 @@ export default function DashboardPage() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
           </button>
-          <h1 className="text-base font-bold">Toutes les concours</h1>
+          <h1 className="text-base font-bold">Tous les concours</h1>
         </div>
 
           {/* Liste des matières */}
