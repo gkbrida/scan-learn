@@ -267,7 +267,8 @@ export default function FichePage() {
   const params = useParams();
   const searchParams = useSearchParams();
   const router = useRouter();
-  
+  const [equipe, setEquipe] = useState(false);
+  const concours = searchParams?.get('concours');
   const id = params?.id as string;
   const ficheId = params?.ficheId as string;
   const [activeTab, setActiveTab] = useState<'fiche' | 'cartes'>('fiche');
@@ -300,6 +301,18 @@ export default function FichePage() {
   };
 
   useEffect(() => {
+    const fetchEquipe = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    const { data: infoUser, error: infoUserError } = await supabase
+      .from('info_users')
+      .select('*')
+      .eq('user_id', user.id);
+    setEquipe(infoUser?.[0].equipe);  
+    };
+    fetchEquipe();
+
+
     // Charger MathJax
     if (!mathJaxLoaded.current) {
       const script = document.createElement('script');
@@ -756,6 +769,7 @@ export default function FichePage() {
               </button>
               <h1 className="text-xl font-semibold">{fiche.nom}</h1>
             </div>
+            {concours === '0' || (concours === '1' && equipe) && (
             <button
               onClick={() => setIsFicheOptionsOpen(true)}
               className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center"
@@ -764,6 +778,7 @@ export default function FichePage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
               </svg>
             </button>
+            )}
           </div>
 
           <div className="flex space-x-8">

@@ -35,6 +35,9 @@ interface Matiere {
   icone: string;
 }
 
+
+
+
 interface Fiche {
   id: string;
   nom: string;
@@ -90,8 +93,44 @@ export default function MatierePage() {
   ]);
   const [fiches, setFiches] = useState<Fiche[]>([]);
   const [progress, setProgress] = useState(0);
+  const [equipe, setEquipe] = useState(false);
+  const [userId, setUserID] = useState('');
+  const searchParams = useSearchParams();
+  const concours = searchParams?.get('concours');
 
   useEffect(() => {
+    const fetchUserID = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          console.error('❌ Aucun utilisateur connecté');
+          setIsLoading(false);
+          return;
+        }
+        setUserID(user.id);
+      };
+      fetchUserID();
+      
+  }, [userId]);
+
+  useEffect(() => {
+    
+    const fetchInfoUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          console.error('❌ Aucun utilisateur connecté');
+          setIsLoading(false);
+          return;
+        }
+      const { data: infoUser, error: infoUserError } = await supabase
+        .from('info_users')
+        .select('*')
+        .eq('user_id', user.id);
+      setEquipe(infoUser?.[0].equipe);
+      console.log("equipe11",infoUser?.[0].equipe);
+    };
+    
+    fetchInfoUser();
+
     const fetchMatiere = async () => {
       if (!params?.id) {
         console.error('ID non trouvé dans les paramètres');
@@ -148,20 +187,17 @@ export default function MatierePage() {
 
   const calculateProgress = async () => {
     try {
-      // Récupérer l'utilisateur connecté
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        console.error('❌ Aucun utilisateur connecté');
-        setProgress(0);
-        return;
-      }
+     
 
       // Récupérer tous les quiz pour cette matière et cet utilisateur
+      
+      const { data: { user } } = await supabase.auth.getUser();
+      const userId = user?.id;
       const { data: quizzes, error: quizError } = await supabase
         .from('qcm')
         .select('id, resultat')
         .eq('matiere_id', params?.id)
-        .eq('user_id', user.id);
+        .eq('user_id', userId);
 
       if (quizError) {
         console.error('❌ Erreur lors de la récupération des quiz:', quizError);
@@ -325,13 +361,6 @@ export default function MatierePage() {
     updateStepStatus('analyse', 'loading');
     
     try {
-      // Récupérer l'utilisateur actuel
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (!user) {
-        toast.error('Vous devez être connecté pour analyser un document');
-        return;
-      }
       let tailleDocument = "";
       if(size.toString() === "petite") {
         tailleDocument = "Create an ultra-concise sheet that goes straight to the point";
@@ -347,14 +376,14 @@ export default function MatierePage() {
         .select('*', { count: 'exact', head: true })
         .eq('matiere_id', params.id);
 
-      const formData = new FormData();
+    const formData = new FormData();
       selectedFiles.forEach((file, idx) => {
         formData.append('file', file);
       });
-      formData.append('matiereId', params.id.toString());
-      formData.append('language', language.toString());
+    formData.append('matiereId', params.id.toString());
+    formData.append('language', language.toString());
       formData.append('size', tailleDocument);
-      formData.append('userId', user.id);
+      formData.append('userId', userId);
       formData.append('nom', ficheName);
 
       const response = await fetch('https://n8n-tb3a.onrender.com/webhook/8c28ab02-e3ae-4aab-ae89-5a182032aa9d', {
@@ -387,7 +416,7 @@ export default function MatierePage() {
         console.log(`📊 Vérification ${i + 1}/10 - Fiches initiales: ${initialCount}, Fiches actuelles: ${currentCount}`);
 
         if (currentCount !== null && initialCount !== null && currentCount > initialCount) {
-          updateStepStatus('analyse', 'completed');
+      updateStepStatus('analyse', 'completed');
           setIsBottomSheetOpen(false);
           
           // Rafraîchir la liste des fiches
@@ -444,13 +473,7 @@ export default function MatierePage() {
     updateStepStatus('analyse', 'loading');
     
     try {
-      // Récupérer l'utilisateur actuel
-      const { data: { user } } = await supabase.auth.getUser();
       
-      if (!user) {
-        toast.error('Vous devez être connecté pour analyser un document');
-        return;
-      }
       let tailleDocument = "";
       if(size.toString() === "petite") {
         tailleDocument = "Create an ultra-concise sheet that goes straight to the point";
@@ -473,7 +496,7 @@ export default function MatierePage() {
       formData.append('matiereId', params.id.toString());
       formData.append('language', language.toString());
       formData.append('size', tailleDocument);
-      formData.append('userId', user.id);
+      formData.append('userId', userId);
       formData.append('nom', ficheNameImg);
       formData.append('nbImg', selectedImages.length.toString());
 
@@ -509,13 +532,13 @@ export default function MatierePage() {
         if (currentCount !== null && initialCount !== null && currentCount > initialCount) {
           updateStepStatus('analyse', 'completed');
           setIsBottomSheetOpen(false);
-          
-          // Rafraîchir la liste des fiches
-          const { data: newFiches, error: fetchError } = await supabase
-            .from('fiches')
-            .select('id, nom, created_at')
-            .eq('matiere_id', params.id)
-            .order('created_at', { ascending: false });
+      
+      // Rafraîchir la liste des fiches
+      const { data: newFiches, error: fetchError } = await supabase
+        .from('fiches')
+        .select('id, nom, created_at')
+        .eq('matiere_id', params.id)
+        .order('created_at', { ascending: false });
 
           if (!fetchError && newFiches) {
             setFiches(newFiches);
@@ -570,14 +593,15 @@ export default function MatierePage() {
         <div className="max-w-4xl mx-auto">
           <div className="flex justify-between items-start">
             <button
-              onClick={() => router.push('/dashboard')}
+              onClick={() => router.back()}
               className="w-10 h-10 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center"
             >
               <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
             </button>
-
+            
+            {(concours === '0') || (concours === '1' && equipe) && 
             <button
               onClick={() => setIsMatiereOptionsOpen(true)}
               className="w-10 h-10 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center"
@@ -585,7 +609,7 @@ export default function MatierePage() {
               <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
               </svg>
-            </button>
+            </button>}
           </div>
 
           <div className="mt-8 flex items-center gap-4">
@@ -625,7 +649,7 @@ export default function MatierePage() {
               {fiches.map((fiche) => (
                 <div
                   key={fiche.id}
-                  onClick={() => router.push(`/matieres/${params?.id}/fiches/${fiche.id}`)}
+                  onClick={() => router.push(`/matieres/${params?.id}/fiches/${fiche.id}?concours=${concours}`)}
                   className="p-4 bg-gray-50 rounded-xl flex items-center justify-between cursor-pointer hover:bg-gray-100 transition-colors"
                 >
                   <div className="flex items-center space-x-3">
@@ -660,18 +684,19 @@ export default function MatierePage() {
               <p className="text-gray-600 text-center mb-8">
                 Crée ta première fiche de révision pour commencer !
               </p>
+              {(concours === '0') || (concours === '1' && equipe) && 
               <button 
                 onClick={() => setIsCreateSheetOpen(true)}
                 className="w-full max-w-sm py-4 px-6 bg-white rounded-full border border-gray-200 text-center font-medium hover:bg-gray-50 transition-colors"
               >
                 Ajouter une fiche
-              </button>
+              </button>}
             </div>
           )}
         </div>
       </div>
     
-      {fiches.length > 0 && (
+      {fiches.length > 0 && (concours === '0' || (concours === '1' && equipe)) && (
         <button
           onClick={() => setIsCreateSheetOpen(true)}
           className="fixed bottom-20 right-3 md:right-1/2 md:translate-x-[calc(24rem+0.75rem)] w-10 h-10 bg-black rounded-full flex items-center justify-center shadow-lg"
@@ -750,8 +775,8 @@ export default function MatierePage() {
                       const files = Array.from(e.target.files || []);
                       if (files.length > 10) {
                         setError('Vous pouvez sélectionner jusqu’à 10 images maximum.');
-                        return;
-                      }
+                          return;
+                        }
                       const invalid = files.find(file => !file.type.startsWith('.pdf'));
                       if (invalid) {
                         setError('Seules les images sont autorisées.');
@@ -776,7 +801,7 @@ export default function MatierePage() {
                 <div className="space-y-2">
                   {selectedFiles.map((file, idx) => (
                     <div key={file.name } className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                      <div className="flex items-center">
+                  <div className="flex items-center">
                         <svg 
                           className="h-8 w-8 text-gray-500 mr-4" 
                           fill="none" 
@@ -789,28 +814,28 @@ export default function MatierePage() {
                             strokeWidth={2} 
                             d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" 
                           />
-                        </svg>
+                    </svg>
                         <div>
                           <p className="text-sm font-medium text-gray-900">{file.name}</p>
                           <p className="text-sm text-gray-500">{(file.size / 1024 / 1024).toFixed(2)} Mo</p>
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => {
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
                           const newFiles = selectedFiles.filter((_, i) => i !== idx);
                           setSelectedFiles(newFiles);
                           if (newFiles.length === 0) {
-                            const input = document.getElementById('file-input') as HTMLInputElement;
-                            if (input) input.value = '';
+                      const input = document.getElementById('file-input') as HTMLInputElement;
+                      if (input) input.value = '';
                           }
-                        }}
-                        className="ml-4 flex-shrink-0 p-1 rounded-full hover:bg-gray-200 transition-colors"
-                      >
-                        <svg className="h-6 w-6 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </button>
+                    }}
+                    className="ml-4 flex-shrink-0 p-1 rounded-full hover:bg-gray-200 transition-colors"
+                  >
+                    <svg className="h-6 w-6 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
                     </div>
                   ))}
                 </div>

@@ -13,7 +13,7 @@ const CLASSES_PAR_NIVEAU = {
   'Collégien': ['6ème', '5ème', '4ème', '3ème'] as string[],
   'Lycéen': ['Seconde', 'Première', 'Terminale'] as string[],
   'Étudiant': ['DEUG/BTS/DUT/DEUST', 'Licence/Licence Pro', 'Master', 'Doctorat'] as string[],
-  'Autre': [] as string[]
+  'Autre': ['Professionnel(le)', 'En Recherche d\'emploi', 'Autre'] as string[]
 };
 
 export default function ModifierClassePage() {

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createBrowserClient } from '@supabase/ssr';
+import BottomNav from '../components/BottomNav';
 
 if (!process.env.NEXT_PUBLIC_SUPABASE_URL) throw new Error('NEXT_PUBLIC_SUPABASE_URL is required');
 if (!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) throw new Error('NEXT_PUBLIC_SUPABASE_ANON_KEY is required');
@@ -108,14 +109,6 @@ export default function AllQuizPage() {
         <div className="sticky top-0 z-10 bg-white border-b border-gray-200">
           <div className="max-w-xl mx-auto px-4">
             <div className="flex items-center h-16">
-              <button
-                onClick={() => router.push('/dashboard')}
-                className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center mr-4"
-              >
-                <svg className="w-6 h-6 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                </svg>
-              </button>
               <h1 className="text-xl font-semibold">Flash Quiz</h1>
             </div>
           </div>
@@ -135,21 +128,13 @@ export default function AllQuizPage() {
       <div className="sticky top-0 z-10 bg-white border-b border-gray-200">
         <div className="max-w-xl mx-auto px-4">
           <div className="flex items-center h-16">
-            <button
-              onClick={() => router.push('/dashboard')}
-              className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center mr-4"
-            >
-              <svg className="w-6 h-6 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-              </svg>
-            </button>
             <h1 className="text-xl font-semibold">Flash Quiz</h1>
           </div>
         </div>
       </div>
 
       {/* Question Card */}
-      <div className="max-w-xl mx-auto px-4 py-6">
+      <div className="max-w-xl mx-auto px-4 py-6 mb-16 pb-16">
         <div className="text-right mb-4">
           Question {currentQuestionIndex + 1}/{questions.length}
         </div>
@@ -196,7 +181,7 @@ export default function AllQuizPage() {
         </div>
 
         {/* Bottom Button */}
-        <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-200">
+        <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-200 mb-16">
           <div className="max-w-xl mx-auto">
             <button
               onClick={handleNextQuestion}
@@ -209,6 +194,9 @@ export default function AllQuizPage() {
             </button>
           </div>
         </div>
+      </div>
+      <div className='fixed bottom-0 left-0 right-0'>
+        <BottomNav />
       </div>
     </div>
   );

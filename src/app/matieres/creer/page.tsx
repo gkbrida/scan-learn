@@ -24,6 +24,7 @@ export default function CreerMatierePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const mode = searchParams?.get('mode') ?? null;
+  const concours = searchParams?.get('concours') ?? null;
   const id = searchParams?.get('id') ?? null;
   const nomParam = searchParams?.get('nom') ?? null;
   const couleurParam = searchParams?.get('couleur') ?? null;
@@ -64,7 +65,8 @@ export default function CreerMatierePage() {
               nom,
               couleur,
               icone,
-              user_id: user.id
+              user_id: user.id,
+              concours: concours ? 1 : 0
             },
           ])
           .select();
@@ -81,37 +83,35 @@ export default function CreerMatierePage() {
     }
   };
 
-  const handleBack = () => {
-    router.push('/dashboard');
-  };
+
 
   return (
     <div className="min-h-screen bg-[#F3F0FF] p-4">
       <div className="max-w-2xl mx-auto">
         <div className="flex justify-between items-center mb-8">
           <button
-            onClick={handleBack}
+            onClick={() => router.back()}
             className="w-10 h-10 rounded-full bg-white flex items-center justify-center"
           >
             <svg className="w-6 h-6 text-black" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
           </button>
-          <h1 className="text-xl font-bold">{mode === 'edit' ? 'Modifier la matière' : 'Créer une matière'}</h1>
+          <h1 className="text-xl font-bold">{mode === 'edit' ? 'Modifier la matière' : concours ? 'Créer un concours' : 'Créer une matière'}</h1>
           <div className="w-10 h-10" /> {/* Spacer */}
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-8">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Nom de la matière
+              {concours ? 'Nom du concours' : 'Nom de la matière'}
             </label>
             <input
               type="text"
               value={nom}
               onChange={(e) => setNom(e.target.value)}
               className="w-full p-4 rounded-2xl bg-white"
-              placeholder="Ex: Mathématiques"
+              placeholder={concours ? "Ex: Police" : "Ex: Mathématiques"}
               required
             />
           </div>

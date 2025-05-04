@@ -196,6 +196,13 @@ export default function ProfilPage() {
             </button>
 
             <button 
+              onClick={() => router.push('/profil/report-problem')}
+              className="w-full bg-white rounded-2xl p-4"
+            >
+              <div className="text-[17px] font-medium">Signaler un problème</div>
+            </button>
+
+            <button 
               onClick={handleLogout}
               className="w-full bg-white rounded-2xl p-4"
             >
