@@ -771,7 +771,7 @@ export default function FichePage() {
               </button>
               <h1 className="text-xl font-semibold">{fiche.nom}</h1>
             </div>
-            {((concours === '0' || concours==null) || (concours === '1' && equipe)) && (
+            {( concours==null ||  equipe) && (
             <button
               onClick={() => setIsFicheOptionsOpen(true)}
               className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center"
