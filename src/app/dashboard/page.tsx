@@ -36,7 +36,8 @@ export default function DashboardPage() {
             *,
             fiches:fiches(count)
           `)
-          .eq('user_id', user.id);
+          .eq('user_id', user.id)
+          .eq('concours', 0);
 
         if (error) {
           console.error('❌ Erreur lors de la récupération des matières:', error);
