@@ -9,6 +9,7 @@ import { ICONS } from '@/app/constants/icons';
 import SizeSelector from '@/app/components/SizeSelector';
 import LanguageSelector from '@/app/components/LanguageSelector';
 import { toast } from 'react-hot-toast';
+import { isNull } from 'util';
 
 // Validation des variables d'environnement
 if (!process.env.NEXT_PUBLIC_SUPABASE_URL) throw new Error('NEXT_PUBLIC_SUPABASE_URL is required');
@@ -126,7 +127,6 @@ export default function MatierePage() {
         .select('*')
         .eq('user_id', user.id);
       setEquipe(infoUser?.[0].equipe);
-      console.log("equipe11",infoUser?.[0].equipe);
     };
     
     fetchInfoUser();
@@ -601,15 +601,15 @@ export default function MatierePage() {
               </svg>
             </button>
             
-            {(concours === '0') || (concours === '1' && equipe) && 
-            <button
+            {((concours === '0' || concours==null) || (concours === '1' && equipe)) && 
+            (<button
               onClick={() => setIsMatiereOptionsOpen(true)}
               className="w-10 h-10 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center"
             >
               <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
               </svg>
-            </button>}
+            </button>)}
           </div>
 
           <div className="mt-8 flex items-center gap-4">
@@ -684,7 +684,7 @@ export default function MatierePage() {
               <p className="text-gray-600 text-center mb-8">
                 Crée ta première fiche de révision pour commencer !
               </p>
-              {(concours === '0') || (concours === '1' && equipe) && 
+              {((concours === '0' || concours==null)  || (concours === '1' && equipe)) && 
               <button 
                 onClick={() => setIsCreateSheetOpen(true)}
                 className="w-full max-w-sm py-4 px-6 bg-white rounded-full border border-gray-200 text-center font-medium hover:bg-gray-50 transition-colors"
@@ -696,7 +696,7 @@ export default function MatierePage() {
         </div>
       </div>
     
-      {fiches.length > 0 && (concours === '0' || (concours === '1' && equipe)) && (
+      {fiches.length > 0 && ((concours === '0' || concours==null)  || (concours === '1' && equipe)) && (
         <button
           onClick={() => setIsCreateSheetOpen(true)}
           className="fixed bottom-20 right-3 md:right-1/2 md:translate-x-[calc(24rem+0.75rem)] w-10 h-10 bg-black rounded-full flex items-center justify-center shadow-lg"

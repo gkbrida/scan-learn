@@ -309,6 +309,8 @@ export default function FichePage() {
       .select('*')
       .eq('user_id', user.id);
     setEquipe(infoUser?.[0].equipe);  
+    console.log("equipe",infoUser?.[0].equipe);
+    console.log("concours",concours);
     };
     fetchEquipe();
 
@@ -769,7 +771,7 @@ export default function FichePage() {
               </button>
               <h1 className="text-xl font-semibold">{fiche.nom}</h1>
             </div>
-            {concours === '0' || (concours === '1' && equipe) && (
+            {((concours === '0' || concours==null) || (concours === '1' && equipe)) && (
             <button
               onClick={() => setIsFicheOptionsOpen(true)}
               className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center"
