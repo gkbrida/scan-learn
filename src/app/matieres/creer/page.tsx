@@ -72,11 +72,7 @@ export default function CreerMatierePage() {
           .select();
 
         if (error) throw error;
-        if (data) {
-          router.push(`/matieres/${data[0].id}`);
-        } else {
-          router.push('/dashboard');
-        }
+        router.push(`/dashboard`);
       }
     } catch (error) {
       console.error('Error:', error);
