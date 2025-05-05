@@ -19,7 +19,7 @@ interface Question {
   options: {
     [key: string]: string;
   };
-  reponse: string;
+  answer: string;
   fiche_id: string;
 }
 
