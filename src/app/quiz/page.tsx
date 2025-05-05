@@ -70,7 +70,7 @@ export default function AllQuizPage() {
 
     const currentQuestion = questions[currentQuestionIndex];
     
-    if (answer === currentQuestion.reponse) {
+    if (answer === currentQuestion.answer) {
       try {
         const { error } = await supabase
           .from('qcm')
@@ -152,7 +152,7 @@ export default function AllQuizPage() {
                 className={`w-full text-left p-4 rounded-xl border ${
                   !isAnswered
                     ? 'bg-white border-gray-200 hover:border-gray-300'
-                    : isAnswered && key === currentQuestion.reponse
+                    : isAnswered && key === currentQuestion.answer
                     ? 'bg-white border-green-500'
                     : isAnswered && key === selectedAnswer
                     ? 'bg-white border-red-500'
@@ -161,14 +161,14 @@ export default function AllQuizPage() {
                 disabled={isAnswered}
               >
                 {value}
-                {isAnswered && key === selectedAnswer && key !== currentQuestion.reponse && (
+                {isAnswered && key === selectedAnswer && key !== currentQuestion.answer && (
                   <span className="absolute right-4 top-1/2 -translate-y-1/2">
                     <svg className="w-6 h-6 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                     </svg>
                   </span>
                 )}
-                {isAnswered && key === currentQuestion.reponse && (
+                {isAnswered && key === currentQuestion.answer && (
                   <span className="absolute right-4 top-1/2 -translate-y-1/2">
                     <svg className="w-6 h-6 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
